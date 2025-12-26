@@ -8,7 +8,7 @@
         select * from employee
         <where>
             <if test="name != null and name != ''">
-               and name ILIKE '%' || #{name} || '%'
+               and name ILIKE concat('%'|| #{name} || '%')
             </if>
 
         </where>
