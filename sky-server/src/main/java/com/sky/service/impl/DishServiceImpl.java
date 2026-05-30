@@ -8,13 +8,16 @@ import com.sky.dto.DishDTO;
 import com.sky.dto.DishPageQueryDTO;
 import com.sky.entity.Dish;
 import com.sky.entity.DishFlavor;
+import com.sky.entity.Setmeal;
 import com.sky.exception.DeletionNotAllowedException;
+import com.sky.exception.SetmealEnableFailedException;
 import com.sky.mapper.DishFlavorMapper;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.SetmealDishMapper;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
 import com.sky.vo.DishVO;
+import com.sun.tools.javac.comp.Todo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -32,6 +35,7 @@ public class DishServiceImpl implements DishService {
     private final DishMapper dishMapper;
     private final DishFlavorMapper dishFlavorMapper;
     private final SetmealDishMapper setmealDishMapper;
+    private final SetmealDishMapper setmealMapper;
 
     /**
      * 新增菜品和对应口味
@@ -61,7 +65,11 @@ public class DishServiceImpl implements DishService {
 
 
     }
-
+    /**
+     * 菜品分页查询
+     * @param dishPageQueryDTO
+     * @return
+     */
     @Override
     public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
         PageHelper.startPage(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
@@ -146,6 +154,47 @@ public class DishServiceImpl implements DishService {
             });
             // 向口味表插入 n 数据
             dishFlavorMapper.insertBatch(flavors);
+        }
+    }
+
+    /**
+     * 根据分类id查询菜品
+     * @param categoryId
+     * @return
+     */
+    public List<Dish> list(Long categoryId) {
+        Dish dish = Dish.builder()
+                .categoryId(categoryId)
+                .status(StatusConstant.ENABLE)
+                .build();
+        return dishMapper.list(dish);
+    }
+
+
+//Todo 菜品起售、停售
+    /**
+     * 菜品起售、停售
+     * @param status
+     * @param id
+     */
+    @Transactional
+    public void startOrStop(Integer status, Long id) {
+        // 1. 修改菜品状态
+        Dish dish = Dish.builder()
+                .id(id)
+                .status(status)
+                .build();
+        dishMapper.update(dish);
+
+        // 2. 如果是停售菜品，联动停售套餐
+        if (StatusConstant.DISABLE == status) {
+            // 查询包含当前菜品的套餐id
+            List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishId(id);
+
+            if (setmealIds != null && !setmealIds.isEmpty()) {
+                // 批量停售套餐
+                setmealMapper.updateStatusByIds(StatusConstant.DISABLE, setmealIds);
+            }
         }
     }
 
